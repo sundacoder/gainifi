@@ -6,10 +6,12 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
     // For the prototype, simply pass through all requests.
     return NextResponse.next();
 }
+
+export default proxy;
 
 export const config = {
     matcher: [
