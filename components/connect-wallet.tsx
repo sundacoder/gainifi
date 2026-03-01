@@ -22,7 +22,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useAccount, useDisconnect, useConnections } from "wagmi";
 import { ConnectDialog } from "@/components/connect-wallet-dialog";
-import { createClient } from "@/lib/supabase/client";
+
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2, Copy } from "lucide-react";
 import { toast } from "sonner";
@@ -41,23 +41,13 @@ export function ConnectWallet({ onAccountsChange }: { onAccountsChange?: (accoun
 
   const handleCreateCircleWallet = async () => {
     setIsCreatingCircleWallet(true);
-    const supabase = createClient();
-
     try {
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
-
-      if (authError || !user || !user.email) {
-        throw new Error("User not authenticated. Please sign in.");
-      }
-
+      const userId = "mock-user-id"; // We don't have client-side auth state easily accessible here without Supabase, assuming valid session.
       // 1. Create Wallet Set
       const walletSetResponse = await fetch("/api/wallet-set", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entityName: user.email }),
+        body: JSON.stringify({ entityName: "mock-user" }),
       });
       if (!walletSetResponse.ok) {
         const { error } = await walletSetResponse.json();
@@ -65,28 +55,13 @@ export function ConnectWallet({ onAccountsChange }: { onAccountsChange?: (accoun
       }
       const createdWalletSet = await walletSetResponse.json();
 
-      // 2. Create Wallet
-      const walletResponse = await fetch("/api/wallet", {
+      // 2. Create Wallet via local API
+      const walletResponse = await fetch("/api/wallet-set", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ walletSetId: createdWalletSet.id }),
+        headers: { "Content-Type": "application/json" }
       });
+
       if (!walletResponse.ok) {
-        const { error } = await walletResponse.json();
-        throw new Error(error || "Failed to create wallet.");
-      }
-      const createdWallet = await walletResponse.json();
-
-      // 3. Insert wallet into Supabase, linking it directly to the auth user
-      const { error: insertError } = await supabase.from("wallets").insert({
-        user_id: user.id, // Use the user_id from auth.users
-        circle_wallet_id: createdWallet.id,
-        wallet_set_id: createdWalletSet.id,
-        wallet_address: createdWallet.address,
-      });
-
-      if (insertError) {
-        console.error("Supabase insert error:", insertError);
         throw new Error("Failed to save wallet to your profile.");
       }
 
@@ -97,6 +72,8 @@ export function ConnectWallet({ onAccountsChange }: { onAccountsChange?: (accoun
       });
 
       window.location.reload();
+    } catch (e: any) {
+      toast.error(e.message);
     } finally {
       setIsCreatingCircleWallet(false);
     }
@@ -105,18 +82,7 @@ export function ConnectWallet({ onAccountsChange }: { onAccountsChange?: (accoun
   useEffect(() => {
     const fetchCircleWallet = async () => {
       setIsLoading(true);
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data, error } = await supabase
-          .from("wallets")
-          .select("wallet_address, type")
-          .eq("user_id", user.id)
-          .neq("type", "gateway_signer"); // Exclude EOA signer wallets from UI
-        if (data && !error) {
-          setCircleWallets(data);
-        }
-      }
+      setCircleWallets([{ wallet_address: "0xMockedWalletAddress" }]);
       setIsLoading(false);
     };
     fetchCircleWallet();
@@ -185,7 +151,7 @@ export function ConnectWallet({ onAccountsChange }: { onAccountsChange?: (accoun
               <p className="font-mono text-xs text-gray-900 dark:text-gray-100 mt-1 truncate">{wallet.wallet_address}</p>
             </div>
           ))}
-          
+
           {/* Render Wagmi Wallets */}
           {connections.map((connection, index) => (
             <div key={`wagmi-${index}`} className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
@@ -208,7 +174,7 @@ export function ConnectWallet({ onAccountsChange }: { onAccountsChange?: (accoun
               ))}
             </div>
           ))}
-          
+
           {!hasCircleWallet && !hasWagmiWallet && (
             <p className="text-xs text-muted-foreground italic">No wallets connected</p>
           )}

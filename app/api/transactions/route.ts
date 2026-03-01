@@ -17,32 +17,22 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/prisma";
+import { cookies } from "next/headers";
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const cookieStore = await cookies();
+  const userId = cookieStore.get("user_id")?.value;
 
-  if (!user) {
+  if (!userId) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const { data: transactions, error } = await supabase
-      .from("transaction_history")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("Error fetching transaction history:", error);
-      return NextResponse.json(
-        { message: "Error fetching transaction history" },
-        { status: 500 }
-      );
-    }
+    const transactions = await prisma.transaction.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    });
 
     return NextResponse.json(transactions);
   } catch (error) {

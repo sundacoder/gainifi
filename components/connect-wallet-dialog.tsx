@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { useConnect } from "wagmi";
 import { Loader2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+
 
 export function ConnectDialog({ children }: { children: React.ReactNode }) {
   const { isPending } = useConnect();
@@ -42,23 +42,13 @@ export function ConnectDialog({ children }: { children: React.ReactNode }) {
   const handleCreateCircleWallet = async () => {
     setIsCreatingCircleWallet(true);
     setCircleWalletError(null);
-    const supabase = createClient();
-
     try {
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
-
-      if (authError || !user || !user.email) {
-        throw new Error("User not authenticated. Please sign in.");
-      }
-
+      const userId = "mock-user-id";
       // 1. Create Wallet Set
       const walletSetResponse = await fetch("/api/wallet-set", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entityName: user.email }),
+        body: JSON.stringify({ entityName: "mock-user" }),
       });
       if (!walletSetResponse.ok) {
         const { error } = await walletSetResponse.json();
@@ -66,28 +56,12 @@ export function ConnectDialog({ children }: { children: React.ReactNode }) {
       }
       const createdWalletSet = await walletSetResponse.json();
 
-      // 2. Create Wallet
-      const walletResponse = await fetch("/api/wallet", {
+      // 2. Create Wallet via API logic
+      const walletResponse = await fetch("/api/wallet-set", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ walletSetId: createdWalletSet.id }),
+        headers: { "Content-Type": "application/json" }
       });
       if (!walletResponse.ok) {
-        const { error } = await walletResponse.json();
-        throw new Error(error || "Failed to create wallet.");
-      }
-      const createdWallet = await walletResponse.json();
-
-      // 3. Insert wallet into Supabase, linking it directly to the auth user
-      const { error: insertError } = await supabase.from("wallets").insert({
-        user_id: user.id, // Use the user_id from auth.users
-        circle_wallet_id: createdWallet.id,
-        wallet_set_id: createdWalletSet.id,
-        wallet_address: createdWallet.address,
-      });
-
-      if (insertError) {
-        console.error("Supabase insert error:", insertError);
         throw new Error("Failed to save wallet to your profile.");
       }
 

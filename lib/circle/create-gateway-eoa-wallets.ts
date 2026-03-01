@@ -22,7 +22,7 @@
  * These wallets will be used to sign Gateway burn intents and must deposit funds to Gateway
  */
 
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/prisma";
 import { circleDeveloperSdk } from "@/lib/circle/sdk";
 
 export interface GatewayEOAWallet {
@@ -66,37 +66,22 @@ export async function generateGatewayEOAWallet(walletSetId: string): Promise<Gat
  * Creates one multichain EOA wallet that can sign for all chains
  */
 export async function storeGatewayEOAWalletForUser(userId: string, walletSetId: string) {
-  const supabase = await createClient();
-
   // Create one EOA wallet in the wallet set
   const wallet = await generateGatewayEOAWallet(walletSetId);
 
   // Store wallet information in database - one record for the multichain wallet
-  const insertData = {
-    user_id: userId,
-    name: wallet.name,
-    address: wallet.address,
-    wallet_address: wallet.address, // For compatibility with existing schema
-    blockchain: "MULTICHAIN", // Indicates it works across all chains
-    type: "gateway_signer",
-    circle_wallet_id: wallet.walletId,
-    wallet_set_id: walletSetId,
-  };
-
-  const { data, error } = await supabase
-    .from("wallets")
-    .insert([insertData])
-    .select();
-
-  if (error) {
-    console.error("Error storing Gateway EOA wallet:", error);
-    throw error;
-  }
+  const newWallet = await prisma.wallet.create({
+    data: {
+      userId: userId,
+      address: wallet.address,
+      network: "EOA",
+    },
+  });
 
   console.log(
     `Stored Gateway EOA wallet for user ${userId} with address ${wallet.address}`
   );
-  return data;
+  return [newWallet];
 }
 
 /**
@@ -107,23 +92,18 @@ export async function getGatewayEOAWalletId(
   userId: string,
   blockchain: string
 ): Promise<{ walletId: string; address: string }> {
-  const supabase = await createClient();
+  // Get the multichain EOA wallet
+  const wallet = await prisma.wallet.findFirst({
+    where: { userId, network: "EOA" },
+  });
 
-  // Get the multichain EOA wallet (blockchain = "MULTICHAIN")
-  const { data, error } = await supabase
-    .from("wallets")
-    .select("circle_wallet_id, address")
-    .eq("user_id", userId)
-    .eq("type", "gateway_signer")
-    .single();
-
-  if (error || !data) {
+  if (!wallet) {
     throw new Error(`Gateway EOA wallet not found for user ${userId}`);
   }
 
   return {
-    walletId: data.circle_wallet_id,
-    address: data.address,
+    walletId: wallet.id,
+    address: wallet.address,
   };
 }
 
@@ -141,24 +121,18 @@ export async function getOrCreateGatewayEOAWallet(
   } catch (error) {
     // Wallet doesn't exist, create it using the user's existing wallet set
     console.log(`Creating Gateway EOA wallet for user ${userId}`);
-    
-    const supabase = await createClient();
-    
+
     // Get the user's existing wallet_set_id from their SCA wallets
-    const { data: scaWallet, error: scaError } = await supabase
-      .from("wallets")
-      .select("wallet_set_id")
-      .eq("user_id", userId)
-      .eq("type", "sca")
-      .limit(1)
-      .single();
-    
-    if (scaError || !scaWallet) {
+    const scaWallet = await prisma.wallet.findFirst({
+      where: { userId, network: "MULTICHAIN" },
+    });
+
+    if (!scaWallet) {
       throw new Error(`No SCA wallet found for user ${userId}. Cannot create EOA wallet.`);
     }
-    
-    await storeGatewayEOAWalletForUser(userId, scaWallet.wallet_set_id);
-    
+
+    await storeGatewayEOAWalletForUser(userId, scaWallet.id);
+
     // Now get the newly created wallet
     return await getGatewayEOAWalletId(userId, blockchain);
   }

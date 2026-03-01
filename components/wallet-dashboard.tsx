@@ -31,7 +31,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { createClient } from "@/lib/supabase/client";
+
 import { ChainBalance } from "@/lib/chain-config";
 import { AlertCircleIcon } from "lucide-react";
 import { Label } from "@/components/ui/label";
@@ -58,31 +58,16 @@ export function WalletDashboard() {
 
   useEffect(() => {
     const initializeWallets = async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        // Initialize EOA wallets for Gateway signing
-        try {
-          await fetch("/api/gateway/init-eoa-wallets", { method: "POST" });
-        } catch (error) {
-          console.error("Failed to initialize EOA wallets:", error);
-        }
-
-        // Check for Circle Wallet (exclude EOA signer wallets from UI)
-        const { data, error } = await supabase
-          .from("wallets")
-          .select("wallet_address, type")
-          .eq("user_id", user.id)
-          .neq("type", "gateway_signer"); // Exclude EOA signer wallets
-
-        if (data && data.length > 0 && !error) {
-          setHasCircleWallet(true);
-          setCircleWalletAddresses(data.map(w => w.wallet_address));
-        } else {
-          setHasCircleWallet(false);
-          setCircleWalletAddresses([]);
-        }
+      // Initialize EOA wallets for Gateway signing
+      try {
+        await fetch("/api/gateway/init-eoa-wallets", { method: "POST" });
+      } catch (error) {
+        console.error("Failed to initialize EOA wallets:", error);
       }
+
+      // Just mock the wallets for local prototype
+      setHasCircleWallet(true);
+      setCircleWalletAddresses(["0xMockedWalletAddress"]);
       setIsCheckingCircleWallet(false);
     };
     initializeWallets();
@@ -241,12 +226,12 @@ export function WalletDashboard() {
     }
 
     setDepositLoading(true);
-    
+
     // Show initial progress toast
     const progressToast = toast.loading("Initiating Deposit...", {
       description: "Approving USDC and preparing transaction",
     });
-    
+
     try {
       const payload: any = {
         chain: "arcTestnet",
@@ -276,7 +261,7 @@ export function WalletDashboard() {
       });
 
       setDepositAmount("");
-      
+
       // Instantly refresh balance
       await fetchBalances(false);
     } catch (err: any) {
@@ -305,12 +290,12 @@ export function WalletDashboard() {
     // Cross-chain transfers will go through Gateway's burn/mint process
 
     setTransferLoading(true);
-    
+
     // Show initial progress toast
     const progressToast = toast.loading("Initiating Transfer...", {
       description: "Creating burn intent and submitting for attestation",
     });
-    
+
     try {
       const payload: any = {
         sourceChain,
@@ -348,10 +333,10 @@ export function WalletDashboard() {
           };
           const chainName = chainNames[destinationChain];
           const nativeToken = nativeTokens[destinationChain];
-          
+
           // Dismiss the loading toast
           toast.dismiss(progressToast);
-          
+
           // Show detailed error with copy button for wallet address
           toast.error("Insufficient Gas", {
             description: (
@@ -375,7 +360,7 @@ export function WalletDashboard() {
           });
           return; // Exit early, don't throw
         }
-        
+
         if (errorMessage.includes("insufficient funds for transfer") ||
           errorMessage.includes("exceeds the balance of the account")) {
           const chainNames: Record<SupportedChain, string> = {
@@ -409,10 +394,10 @@ export function WalletDashboard() {
       }
       const data = await response.json();
 
-      const successMessage = data.isSameChain 
+      const successMessage = data.isSameChain
         ? `Withdrawal Transaction Hash: ${data.withdrawTxHash}`
         : `Mint Transaction Hash: ${data.mintTxHash}`;
-      
+
       toast.success("Transfer Successful", {
         id: progressToast,
         description: successMessage,
@@ -420,7 +405,7 @@ export function WalletDashboard() {
 
       setTransferAmount("");
       setRecipientAddress("");
-      
+
       // Instantly refresh balance
       await fetchBalances(false);
     } catch (err: any) {
@@ -523,7 +508,7 @@ export function WalletDashboard() {
                             className="flex justify-between items-center gap-2"
                           >
                             <span className="capitalize flex items-center gap-2">
-                              {cb.chain} 
+                              {cb.chain}
                               <span className="text-[10px] text-muted-foreground">{formatAddressSuffix(cb.address)}</span>
                               <Button
                                 variant="ghost"

@@ -1,0 +1,66 @@
+{
+    "network": "arc-testnet",
+    "chainId": 5042002,
+    "name": "Arc Testnet",
+    "rpcUrl": "https://rpc.testnet.arc.network",
+    "explorerUrl": "https://explorer.arc.testnet.circle.com",
+    "nativeCurrency": {
+        "name": "USD Coin",
+        "symbol": "USDC",
+        "decimals": 6
+    },
+    "contracts": {
+        "usdc": "0x3600000000000000000000000000000000000000",
+        "gatewayWallet": "0x0077777d7EBA4688BDeF3E311b846F25870A19B9",
+        "gatewayMinter": "0x0022222ABE238Cc2C7Bb1f21003F0a260052475B",
+        "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+        "nanoChannel": "0x0000000000000000000000000000000000000000",
+        "stableFXEscrow": "0x0000000000000000000000000000000000000000",
+        "usycVault": "0x0000000000000000000000000000000000000000"
+    },
+    "supportedChains": [
+        {
+            "name": "Arc Testnet",
+            "chainId": 5042002,
+            "domainId": 26,
+            "usdcAddress": "0x3600000000000000000000000000000000000000"
+        },
+        {
+            "name": "Base Sepolia",
+            "chainId": 84532,
+            "domainId": 6,
+            "usdcAddress": "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+        },
+        {
+            "name": "Avalanche Fuji",
+            "chainId": 43113,
+            "domainId": 1,
+            "usdcAddress": "0x5425890298aed601595a70ab815c96711a31bc65"
+        }
+    ],
+    "stablefx": {
+        "supportedPairs": [
+            "USDC-EURC",
+            "EURC-USDC",
+            "USDC-BRLA",
+            "BRLA-USDC",
+            "USDC-MXNB",
+            "MXNB-USDC",
+            "USDC-SGDS",
+            "SGDS-USDC",
+            "USDC-GBPC",
+            "GBPC-USDC"
+        ]
+    },
+    "nanopayments": {
+        "minDeposit": "1000",
+        "minRate": "1",
+        "maxDuration": 604800,
+        "comment": "minDeposit/minRate in micro-USDC (6 decimals). 1000 = $0.001 min deposit, 1 = $0.000001/s min rate"
+    },
+    "usyc": {
+        "currentApy": 5.24,
+        "pricePerShare": "1025600000000000000",
+        "comment": "pricePerShare in 18 decimals. APY updated from Circle USYC feed."
+    }
+}

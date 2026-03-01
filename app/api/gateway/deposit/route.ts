@@ -21,18 +21,17 @@ import {
   initiateDepositFromCustodialWallet,
   type SupportedChain,
 } from "@/lib/circle/gateway-sdk";
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/prisma";
+import { cookies } from "next/headers";
 
 export async function POST(req: NextRequest) {
   let requestBody: any = {};
-  
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
 
-    if (!user) {
+  try {
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("user_id")?.value;
+
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -77,23 +76,16 @@ export async function POST(req: NextRequest) {
     const amountInAtomicUnits = BigInt(Math.floor(parsedAmount * 1_000_000));
 
     // Get the user's multichain SCA wallet
-    const { data: wallets, error: walletError } = await supabase
-      .from("wallets")
-      .select("circle_wallet_id, wallet_set_id, address")
-      .eq("user_id", user.id)
-      .eq("type", "sca")
-      .limit(1);
-
-    if (walletError) {
-      console.error("Database error fetching wallets:", walletError);
-      return NextResponse.json(
-        { error: "Database error when fetching wallets." },
-        { status: 500 }
-      );
-    }
+    const wallets = await prisma.wallet.findMany({
+      where: {
+        userId,
+        network: "MULTICHAIN",
+      },
+      take: 1,
+    });
 
     if (!wallets || wallets.length === 0) {
-      console.log(`No SCA wallet found for user ${user.id}`);
+      console.log(`No SCA wallet found for user ${userId}`);
       return NextResponse.json(
         { error: "No Circle wallet found. Please ensure wallet is created during signup." },
         { status: 404 }
@@ -102,32 +94,27 @@ export async function POST(req: NextRequest) {
 
     const wallet = wallets[0];
 
-    // Get or create EOA signer wallet (multichain)
     const { getOrCreateGatewayEOAWallet } = await import("@/lib/circle/create-gateway-eoa-wallets");
-    const { address: eoaAddress } = await getOrCreateGatewayEOAWallet(user.id, chain);
+    const { address: eoaAddress } = await getOrCreateGatewayEOAWallet(userId, chain);
 
     // Deposit to Gateway and add EOA as delegate (allows EOA to sign burn intents)
     const txHash = await initiateDepositFromCustodialWallet(
-      wallet.circle_wallet_id,
+      wallet.address, // or circle_wallet_id if stored
       chain as SupportedChain,
       amountInAtomicUnits,
       eoaAddress as `0x${string}`
     );
 
-    // Store transaction in database
-    await supabase.from("transaction_history").insert([
-      {
-        user_id: user.id,
+    await prisma.transaction.create({
+      data: {
+        userId,
         chain,
-        tx_type: "deposit",
-        amount: parseFloat(amount),
-        tx_hash: txHash,
-        // This should probably be dynamic if you support multiple gateways
-        gateway_wallet_address: "0x0077777d7EBA4688BDeF3E311b846F25870A19B9",
-        status: "success",
-        created_at: new Date().toISOString(),
+        type: "vault", // using "vault" as equivalent of deposit for mvp schema
+        amount: String(parsedAmount),
+        txHash,
+        status: "settled",
       },
-    ]);
+    });
 
     return NextResponse.json({
       success: true,
@@ -138,25 +125,20 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error("Error in deposit:", error);
 
-    // Log failed transaction to database
     try {
-      const supabase = await createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const cookieStore = await cookies();
+      const errUserId = cookieStore.get("user_id")?.value;
 
-      if (user && requestBody.chain) {
-        await supabase.from("transaction_history").insert([
-          {
-            user_id: user.id,
+      if (errUserId && requestBody.chain) {
+        await prisma.transaction.create({
+          data: {
+            userId: errUserId,
             chain: requestBody.chain,
-            tx_type: "deposit",
-            amount: parseFloat(requestBody.amount || 0),
+            type: "vault",
+            amount: String(requestBody.amount || 0),
             status: "failed",
-            reason: error.message || "Unknown error",
-            created_at: new Date().toISOString(),
           },
-        ]);
+        });
       }
     } catch (dbError) {
       console.error("Error logging failed transaction:", dbError);

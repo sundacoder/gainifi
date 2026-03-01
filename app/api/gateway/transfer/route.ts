@@ -25,18 +25,17 @@ import {
   type SupportedChain,
   CIRCLE_CHAIN_NAMES,
 } from "@/lib/circle/gateway-sdk";
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/prisma";
+import { cookies } from "next/headers";
 import type { Address } from "viem";
 import { Transaction, Blockchain } from "@circle-fin/developer-controlled-wallets";
 import { circleDeveloperSdk } from "@/lib/circle/sdk";
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const cookieStore = await cookies();
+  const userId = cookieStore.get("user_id")?.value;
 
-  if (!user) {
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -76,23 +75,16 @@ export async function POST(req: NextRequest) {
     const amountInAtomicUnits = BigInt(Math.floor(parseFloat(amount) * 1_000_000));
 
     // Get the user's multichain SCA wallet
-    const { data: wallets, error: walletError } = await supabase
-      .from("wallets")
-      .select("circle_wallet_id, address")
-      .eq("user_id", user.id)
-      .eq("type", "sca")
-      .limit(1);
+    const wallets = await prisma.wallet.findMany({
+      where: {
+        userId,
+        network: "MULTICHAIN",
+      },
+      take: 1,
+    });
 
-    if (walletError) {
-      console.error("Database error fetching wallets:", walletError);
-      return NextResponse.json(
-        { error: "Database error when fetching wallets." },
-        { status: 500 }
-      );
-    }
-
-    if (!wallets || wallets.length === 0 || !wallets[0]?.circle_wallet_id) {
-      console.log(`No SCA wallet found for user ${user.id}`);
+    if (!wallets || wallets.length === 0 || !wallets[0]?.address) {
+      console.log(`No SCA wallet found for user ${userId}`);
       return NextResponse.json(
         { error: "No Circle wallet found. Please ensure wallet is created during signup." },
         { status: 404 }
@@ -100,20 +92,20 @@ export async function POST(req: NextRequest) {
     }
 
     const wallet = wallets[0];
-    const walletId = wallet.circle_wallet_id;
+    const walletId = wallet.address; // For mock/local version we use address
     const walletAddress = wallet.address as Address;
     const recipient = recipientAddress || walletAddress;
 
     // Determine if we're using external recipient
     const isExternalRecipient = recipientAddress && recipientAddress.toLowerCase() !== walletAddress.toLowerCase();
-    
+
     // PRE-FLIGHT CHECK: Verify gas balance on destination chain BEFORE burning
     const { getGatewayEOAWalletId } = await import("@/lib/circle/create-gateway-eoa-wallets");
     const { checkWalletGasBalance } = await import("@/lib/circle/gateway-sdk");
-    
+
     try {
       let minterWalletId: string;
-      
+
       if (isExternalRecipient) {
         // For external recipients, EOA wallet will execute mint
         const chainMap: Record<SupportedChain, string> = {
@@ -121,16 +113,16 @@ export async function POST(req: NextRequest) {
           avalancheFuji: 'AVAX-FUJI',
           arcTestnet: 'ARC-TESTNET',
         };
-        const { walletId: eoaWalletId } = await getGatewayEOAWalletId(user.id, chainMap[destinationChain as SupportedChain]);
+        const { walletId: eoaWalletId } = await getGatewayEOAWalletId(userId, chainMap[destinationChain as SupportedChain]);
         minterWalletId = eoaWalletId;
       } else {
         // For own wallet, SCA wallet will execute mint
         minterWalletId = walletId;
       }
-      
+
       // Check if the minter wallet has gas
       const gasCheck = await checkWalletGasBalance(minterWalletId, destinationChain as SupportedChain);
-      
+
       if (!gasCheck.hasGas) {
         return NextResponse.json(
           {
@@ -144,7 +136,7 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
-      
+
       console.log(`Gas check passed for ${gasCheck.address} on ${destinationChain} (balance: ${gasCheck.balance})`);
     } catch (gasCheckError: any) {
       console.error("Gas pre-flight check failed:", gasCheckError);
@@ -153,7 +145,7 @@ export async function POST(req: NextRequest) {
 
     // Use EOA-signed burn/mint process for all transfers (same-chain and cross-chain)
     const { attestation, attestationSignature } = await transferGatewayBalanceWithEOA(
-      user.id,
+      userId,
       amountInAtomicUnits,
       sourceChain as SupportedChain,
       destinationChain as SupportedChain,
@@ -165,7 +157,7 @@ export async function POST(req: NextRequest) {
     // If recipient is external (not the user's wallet), use EOA to execute mint
     // Otherwise use the user's Circle SCA wallet
     const mintTx: Transaction = await executeMintCircle(
-      isExternalRecipient ? user.id : walletId,
+      isExternalRecipient ? userId : walletId,
       destinationChain as SupportedChain,
       attestation,
       attestationSignature,
@@ -175,20 +167,16 @@ export async function POST(req: NextRequest) {
     const attestationHash = attestation;
     const mintTxHash = mintTx.txHash;
 
-    // Store transaction in database
-    await supabase.from("transaction_history").insert([
-      {
-        user_id: user.id,
+    await prisma.transaction.create({
+      data: {
+        userId,
         chain: sourceChain,
-        tx_type: "transfer",
-        amount: parseFloat(amount),
-        tx_hash: mintTxHash,
-        gateway_wallet_address: "0x0077777d7EBA4688BDeF3E311b846F25870A19B9",
-        destination_chain: destinationChain,
-        status: "success",
-        created_at: new Date().toISOString(),
+        type: "transfer",
+        amount: String(parseFloat(amount)),
+        txHash: mintTxHash,
+        status: "settled",
       },
-    ]);
+    });
 
     return NextResponse.json({
       success: true,
@@ -205,12 +193,12 @@ export async function POST(req: NextRequest) {
     // Check if this is an insufficient gas error
     if (error.message?.startsWith("INSUFFICIENT_GAS:")) {
       const [, walletId, blockchain] = error.message.split(":");
-      
+
       // Get the wallet address
       try {
         const walletResponse = await circleDeveloperSdk.getWallet({ id: walletId });
         const eoaAddress = walletResponse.data?.wallet?.address;
-        
+
         return NextResponse.json(
           {
             error: "INSUFFICIENT_GAS",
@@ -226,26 +214,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Log failed transaction to database
     try {
-      const supabase = await createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const cookieStore = await cookies();
+      const errUserId = cookieStore.get("user_id")?.value;
 
-      if (user) {
-        await supabase.from("transaction_history").insert([
-          {
-            user_id: user.id,
+      if (errUserId) {
+        await prisma.transaction.create({
+          data: {
+            userId: errUserId,
             chain: sourceChain,
-            tx_type: "transfer",
-            amount: parseFloat(amount || 0),
-            destination_chain: destinationChain,
+            type: "transfer",
+            amount: String(parseFloat(amount || "0")),
             status: "failed",
-            reason: error.message || "Unknown error",
-            created_at: new Date().toISOString(),
           },
-        ]);
+        });
       }
     } catch (dbError) {
       console.error("Error logging failed transaction:", dbError);

@@ -1,21 +1,3 @@
-/**
- * Copyright 2026 Circle Internet Group, Inc.  All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import type { Metadata } from "next";
 import { ThemeProvider } from "next-themes";
 import { WagmiProvider } from "@/components/wagmi-provider";
@@ -27,8 +9,20 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "Multichain Gateway Wallet",
-  description: "Demo for wallet with unified cross-chain USDC balances and transfers",
+  title: "Gainifi — Stablecoin Exchange & Nanopayments on Arc",
+  description:
+    "The premier stablecoin exchange with sub-cent nanopayment streams, cross-chain USDC liquidity via Circle Gateway, and on-chain yield via USYC — all built on Arc L1 with 0.5s finality.",
+  keywords: [
+    "stablecoin exchange",
+    "nanopayments",
+    "USDC",
+    "Arc network",
+    "Circle Gateway",
+    "StableFX",
+    "USYC",
+    "DeFi",
+    "cross-chain",
+  ],
 };
 
 export default function RootLayout({
@@ -38,16 +32,22 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body className="font-sans antialiased">
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
+          defaultTheme="dark"
           enableSystem
           disableTransitionOnChange
         >
-          <WagmiProvider>
-            {children}
-          </WagmiProvider>
+          <WagmiProvider>{children}</WagmiProvider>
         </ThemeProvider>
       </body>
     </html>

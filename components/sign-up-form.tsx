@@ -19,7 +19,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -47,43 +47,19 @@ export function SignUpForm({
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    const supabase = createClient();
-    setIsLoading(true);
-    setError(null);
-
-    if (password !== repeatPassword) {
-      setError("Passwords do not match");
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`,
-        },
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
       });
-      if (error) throw error;
 
-      // If user is created, initialize wallets in the background
-      if (data.user) {
-        try {
-          // Create wallet set with SCA wallets for each chain
-          await fetch("/api/wallet-set", {
-            method: "POST",
-          });
-
-          // Create EOA signer wallets for Gateway (hidden from UI)
-          await fetch("/api/gateway/init-eoa-wallets", {
-            method: "POST",
-          });
-        } catch (walletError) {
-          console.error("Error creating wallets during signup:", walletError);
-          // Continue with signup even if wallet creation fails
-        }
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Registration failed");
       }
+
+
 
       router.push("/dashboard");
     } catch (error: unknown) {

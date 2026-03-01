@@ -18,16 +18,14 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { fetchGatewayInfo } from "@/lib/circle/gateway-sdk";
-import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("user_id")?.value;
 
-    if (!user) {
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

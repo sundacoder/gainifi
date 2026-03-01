@@ -17,34 +17,30 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { circleDeveloperSdk } from "@/lib/circle/sdk";
+import { cookies } from "next/headers";
 import type { SupportedChain } from "@/lib/circle/gateway-sdk";
-
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const cookieStore = await cookies();
+  const userId = cookieStore.get("user_id")?.value;
 
-  if (!user) {
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
     const { getGatewayEOAWalletId } = await import("@/lib/circle/create-gateway-eoa-wallets");
-    
+
     const chains = ["BASE-SEPOLIA", "AVAX-FUJI", "ARC-TESTNET"];
     const chainMap: Record<string, SupportedChain> = {
       "BASE-SEPOLIA": "baseSepolia",
       "AVAX-FUJI": "avalancheFuji",
       "ARC-TESTNET": "arcTestnet",
     };
-    
+
     const wallets = await Promise.all(
       chains.map(async (blockchain) => {
         try {
-          const { walletId, address } = await getGatewayEOAWalletId(user.id, blockchain);
+          const { walletId, address } = await getGatewayEOAWalletId(userId, blockchain);
           return {
             chain: chainMap[blockchain],
             blockchain,

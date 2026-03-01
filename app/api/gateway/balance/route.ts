@@ -18,17 +18,15 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { fetchGatewayBalance, getUsdcBalance, CHAIN_BY_DOMAIN, type SupportedChain } from "@/lib/circle/gateway-sdk";
-import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 import type { Address } from "viem";
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("user_id")?.value;
 
-    if (!user) {
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

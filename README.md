@@ -1,154 +1,89 @@
-# Arc Multichain Wallet
+# GainiFi - Arc Multichain Stablecoin Exchange with Nanopayments
 
-A sample application demonstrating how to build optimal USDC interoperability UX for wallets using Arc and Circle Gateway. This app showcases unified balance management, deposits, and cross-chain transfers across multiple EVM chains using Next.js and Supabase.
+GainiFi is an optimal Web3 DeFi platform demonstrating powerful USDC interoperability and unified balance management across EVM chains using the **Circle Gateway**, **Circle Developer-Controlled Wallets**, and **Arc Testnet**. 
 
-<img width="830" height="658" alt="Interface for depositing to and transfering from a Gateway balance" src="public/screenshot.png" />
+GainiFi leverages Next.js, Radix UI, wagmi/viem for web3 connections, and Supabase + Prisma for a fast and robust database layer.
+
+## Core Features
+1. **Developer-Controlled Wallets:** Invisible, seamless, and programmable wallets abstracting gas and seed phrases from the end-user using the Circle W3S API.
+2. **Unified Balances:** A unified USDC balance available seamlessly across multiple chains without manual bridging.
+3. **Cross-Chain Transfers:** Execute rapid native deposits and mints using the Circle Gateway architecture and intent-based architecture (EIP-712).
+4. **Smart Contracts Integrations:** Interaction with Nano Channels, StableFX Escrow, and USYC Vaults directly from the unified wallet address.
 
 ## Prerequisites
 
 - Node.js 20.x or newer
-- npm (automatically installed when Node.js is installed)
-- Docker (for running Supabase locally)
+- npm or yarn
+- Docker (if running a local Supabase instance)
 - Circle Developer Controlled Wallets [API key](https://console.circle.com/signin) and [Entity Secret](https://developers.circle.com/wallets/dev-controlled/register-entity-secret)
+- Arc Testnet RPC node access
 
 ## Getting Started
 
-1. Clone the repository and install dependencies:
+### 1. Clone & Install
+```bash
+git clone <your-github-repo-url>
+cd gainifi
+npm install
+```
 
-   ```bash
-   git clone git@github.com:circlefin/arc-multichain-wallet.git
-   cd arc-multichain-wallet
-   npm install
-   ```
-   
-2. Create a `.env.local` file in the project root:
+### 2. Configure Environment Variables
+Copy the `.env.example` file to create your own local environment file:
+```bash
+cp .env.example .env.local
+```
 
-   ```bash
-   cp .env.example .env.local
-   ```
+You must fill in the mandatory variables in `.env.local`:
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL="your-supabase-url"
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="your-anon-key"
 
-   Required variables:
+# Circle API (Testnet)
+# Important: Prefix your Circle Testnet API key with "TEST_API_KEY:"
+CIRCLE_API_KEY="TEST_API_KEY:your_id:your_secret"
 
-   ```bash
-   # Supabase
-   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_publishable_or_anon_key
+# 32-byte Hex Entity Secret (Generated locally by your scripts)
+CIRCLE_ENTITY_SECRET="your_64_character_hex_string"
 
-   # Circle
-   CIRCLE_API_KEY=your_circle_api_key
-   CIRCLE_ENTITY_SECRET=your_entity_secret
-   ```
+# Arc / Smart Contracts
+ARC_TESTNET_RPC_KEY="your_rpc_key"
+NEXT_PUBLIC_NANO_CHANNEL_ADDRESS="0x..."
+NEXT_PUBLIC_STABLEFX_ESCROW_ADDRESS="0x..."
+NEXT_PUBLIC_USYC_VAULT_ADDRESS="0x..."
+```
 
-3. Set up Supabase (Local)
-   This project uses **local Supabase** via Docker for development:
+*(Note: If you need to generate a new Circle Entity Secret and the 684-character Ciphertext, run: `node scripts/generate-circle-secret.js`)*
 
-   ```bash
-   # Start local Supabase (requires Docker)
-   npx supabase start
+### 3. Setup Database (Supabase & Prisma)
+This project uses **Prisma** configured with **SQLite** for local development, or Supabase PostgreSQL depending on your `prisma.schema`. 
+To push the schema and generate the client:
+```bash
+npx prisma db push
+npx prisma generate
+```
 
-   # Push database migrations
-   npx supabase db push
-   ```
-   **Note:** If you prefer cloud-hosted Supabase, you can use:
-   
-   ```bash
-   npx supabase link
-   npx supabase db push
-   ```
+### 4. Run the Development Server
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) with your browser to explore the dashboard.
 
-4. Start the development server:
+## Project Structure
 
-   ```bash
-   npm run dev
-   ```
+- `/app`: Next.js 14+ App Router containing the dashboard, authentication, and layout loops.
+- `/app/api`: Backend endpoints handling server-side interactions with the Circle W3S API (Wallet Set creation, Gateway APIs, etc.) keeping secrets completely hidden from the frontend.
+- `/components`: Reusable UI components built with Radix UI and styled via Tailwind CSS.
+- `/lib`: Helper utilities, configuration files, and the Prisma client instance.
+- `/scripts`: Utility scripts including `generate-circle-secret.js` for automating the encryption of the Circle Entity Secret.
 
-   The app will be available at `http://localhost:3000`.
-
-## How It Works
-
-- Built with [Next.js](https://nextjs.org/) and [Supabase](https://supabase.com/)
-- Uses [Circle Gateway](https://developers.circle.com/gateway) for unified USDC balance and cross-chain transfers
-- Integrates [Circle Developer Controlled Wallets](https://developers.circle.com/wallets/dev-controlled) for server-side wallet operations
-- Demonstrates wallet connectivity with [Wagmi](https://wagmi.sh/) and [Viem](https://viem.sh/)
-
-### Unified Balance
-
-When you deposit USDC to the Gateway Wallet, it becomes part of your unified balance accessible from any supported chain. The Gateway Wallet uses the same address on all chains: `0x0077777d7EBA4688BDeF3E311b846F25870A19B9`
-
-### Deposit Flow
-
-1. Approve Gateway Wallet to spend your USDC
-2. Call `deposit()` to transfer USDC to Gateway
-3. Balance becomes available across all chains after finalization
-
-### Cross-Chain Transfer Flow
-
-1. Create and sign burn intent (EIP-712)
-2. Submit to Gateway API for attestation
-3. Call `gatewayMint()` on destination chain
-4. USDC minted on destination
-
-## Environment Variables
-
-| Variable                              | Scope       | Purpose                                                                  |
-| ------------------------------------- | ----------- | ------------------------------------------------------------------------ |
-| `NEXT_PUBLIC_SUPABASE_URL`            | Public      | Supabase project URL                                                     |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Public     | Supabase anonymous/public key                                            |
-| `CIRCLE_API_KEY`                      | Server-side | Circle API key for Gateway operations                                    |
-| `CIRCLE_ENTITY_SECRET`                | Server-side | Circle entity secret for wallet operations                               |
-
-## Usage Notes
-
-- Designed for testnet only
-- Requires valid Circle API credentials and Supabase configuration
-- Private keys are processed server-side and never stored
-- Never use mainnet private keys with this application
-
-## Scripts
-
-- `npm run dev`: Start Next.js development server with auto-reload
-- `npx supabase start`: Start local Supabase instance
-
-## Security & Usage Model
-
-This sample application:
-- Assumes testnet usage only
-- Handles secrets via environment variables
-- Processes private keys server-side without storage
-- Is not intended for production use without modification
-
-See `SECURITY.md` for vulnerability reporting guidelines. Please report issues privately via Circle's bug bounty program.
-
-## Getting Testnet USDC
-
-To test the application, you'll need testnet USDC on the supported chains. Use the Circle Faucet to get free testnet tokens:
-
-### Using the Circle Faucet
-
-1. **Get Your Wallet Address**: After signing up, your Circle Wallet addresses will be displayed in the dashboard
-2. **Visit the Faucet**: Go to [https://faucet.circle.com/](https://faucet.circle.com/)
-3. **Request Tokens**: 
-   - Enter your wallet address
-   - Select the desired testnet (Arc Testnet, Base Sepolia, or Avalanche Fuji)
-   - Request USDC
-4. **Wait for Confirmation**: Transactions typically confirm within a few minutes
-5. **Deposit to Gateway**: Once received, use the "Deposit" tab to add USDC to your Gateway balance
-
-### Supported Testnets
-
-- **Arc Testnet**: Primary chain for deposits and Gateway operations
-- **Base Sepolia**: Ethereum Layer 2 testnet
-- **Avalanche Fuji**: Avalanche testnet
-
-### Note on Gas Fees
-
-When transferring USDC cross-chain, you'll need native tokens on the destination chain to pay for gas fees:
-- **Arc Testnet**: USDC (no additional gas token needed)
-- **Base Sepolia**: ETH (get from [Base Sepolia Faucet](https://www.alchemy.com/faucets/base-sepolia))
-- **Avalanche Fuji**: AVAX (get from [Avalanche Faucet](https://core.app/tools/testnet-faucet/))
+## Security & Best Practices
+- **Never commit `.env.local` or `.env` to GitHub.** Our `.gitignore` is configured to ignore these files to prevent accidental leakage of `CIRCLE_API_KEY` and `CIRCLE_ENTITY_SECRET`.
+- This template relies on storing the Base64 Entity Secret cipher locally via your Node config script, strictly for development or securely bound backend servers.
+- This codebase is designed for **Testnet** usage.
 
 ## Resources
-
-- [Circle Gateway Documentation](https://developers.circle.com/gateway)
-- [Unified Balance Guide](https://developers.circle.com/gateway/howtos/create-unified-usdc-balance)
-- [Circle Faucet](https://faucet.circle.com/)
+- [Circle Programmable Wallets](https://developers.circle.com/wallets)
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Wagmi](https://wagmi.sh/react/getting-started)
+- [Radix UI](https://www.radix-ui.com/)

@@ -17,7 +17,7 @@
  */
 
 // lib/deposit.ts
-import { createClient } from '@/lib/supabase/server';
+import { prisma } from "@/lib/prisma";
 
 export type DepositParams = {
   userId?: string;
@@ -30,8 +30,7 @@ export type DepositResult =
   | { error: string };
 
 export async function handleDeposit(
-  params: DepositParams,
-  supabaseClient?: any
+  params: DepositParams
 ): Promise<DepositResult> {
   const { userId, chain, amount } = params;
 
@@ -54,22 +53,20 @@ export async function handleDeposit(
     gasPaidWithUSDC: true,
   };
 
-  // Store transaction in Supabase
+  // Store transaction in Local DB
   try {
-    const supabase = supabaseClient || await createClient();
-    await supabase
-      .from('transaction_history')
-      .insert([{
-        user_id: userId,
+    await prisma.transaction.create({
+      data: {
+        userId: userId,
         chain,
-        tx_type: 'deposit',
-        amount,
-        tx_hash: depositResult.txHash,
-        gateway_wallet_address: depositResult.gatewayWalletAddress,
-        created_at: new Date().toISOString(),
-      }]);
+        type: "vault",
+        amount: String(amount),
+        txHash: depositResult.txHash,
+        status: "settled",
+      }
+    });
   } catch (e) {
-    // For unit tests, ignore Supabase errors
+    // For unit tests, ignore errors
   }
 
   return { success: true, depositResult };

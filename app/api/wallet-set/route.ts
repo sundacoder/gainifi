@@ -18,7 +18,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { circleDeveloperSdk } from "@/lib/circle/sdk";
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/prisma";
+import { cookies } from "next/headers";
 
 export async function PUT(req: NextRequest) {
   try {
@@ -54,23 +55,19 @@ export async function PUT(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("user_id")?.value;
 
-    if (!user) {
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if wallet set already exists for this user
-    const { data: existingWallets } = await supabase
-      .from("wallets")
-      .select("wallet_set_id")
-      .eq("user_id", user.id)
-      .limit(1);
+    // Check if wallet already exists for this user
+    const existingWallet = await prisma.wallet.findFirst({
+      where: { userId, network: "MULTICHAIN" },
+    });
 
-    if (existingWallets && existingWallets.length > 0) {
+    if (existingWallet) {
       return NextResponse.json({
         success: true,
         message: "Wallet set already exists for this user",
@@ -79,7 +76,7 @@ export async function POST(req: NextRequest) {
 
     // Create wallet set
     const walletSetResponse = await circleDeveloperSdk.createWalletSet({
-      name: `User ${user.id.substring(0, 8)} - Wallet Set`,
+      name: `User ${userId.substring(0, 8)} - Wallet Set`,
     });
 
     if (!walletSetResponse.data?.walletSet) {
@@ -91,7 +88,7 @@ export async function POST(req: NextRequest) {
     // Create ONE multichain SCA wallet (works across all EVM chains)
     const walletsResponse = await circleDeveloperSdk.createWallets({
       accountType: "SCA",
-      blockchains: ["ARC-TESTNET"], // Create on one chain, same address on all
+      blockchains: ["ARC-TESTNET"],
       count: 1,
       walletSetId,
     });
@@ -100,32 +97,21 @@ export async function POST(req: NextRequest) {
       throw new Error("Failed to create wallet");
     }
 
-    // Store ONE multichain wallet in database
     const wallet = walletsResponse.data.wallets[0];
-    const walletRecords = [{
-      user_id: user.id,
-      circle_wallet_id: wallet.id,
-      wallet_set_id: walletSetId,
-      wallet_address: wallet.address,
-      address: wallet.address,
-      blockchain: "MULTICHAIN", // Indicates it works across all chains
-      type: "sca",
-      name: "Multichain Wallet",
-    }];
 
-    const { error: insertError } = await supabase
-      .from("wallets")
-      .insert(walletRecords);
-
-    if (insertError) {
-      console.error("Error storing wallets in database:", insertError);
-      throw insertError;
-    }
+    // Store ONE multichain wallet in database using Prisma
+    const newWallet = await prisma.wallet.create({
+      data: {
+        address: wallet.address,
+        userId: userId,
+        network: "MULTICHAIN",
+      },
+    });
 
     return NextResponse.json({
       success: true,
       walletSetId,
-      wallets: walletRecords,
+      wallets: [newWallet],
     });
   } catch (error: any) {
     console.error("Wallet set creation failed:", error);

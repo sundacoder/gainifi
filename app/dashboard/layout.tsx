@@ -1,61 +1,100 @@
-/**
- * Copyright 2026 Circle Internet Group, Inc.  All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- * SPDX-License-Identifier: Apache-2.0
- */
+"use client";
 
 import Link from "next/link";
-import { EnvVarWarning } from "@/components/env-var-warning";
-import { AuthButton } from "@/components/auth-button";
+import { usePathname } from "next/navigation";
 import { ThemeSwitcher } from "@/components/theme-switcher";
-import { hasEnvVars } from "@/lib/utils";
 import { Toaster } from "@/components/ui/sonner";
 
-export default function ProtectedLayout({
+const navItems = [
+  { href: "/dashboard", label: "Overview", icon: "◉" },
+  { href: "/dashboard/exchange", label: "Exchange", icon: "⇄" },
+  { href: "/dashboard/stream", label: "Nanopay", icon: "⚡" },
+  { href: "/dashboard/vault", label: "Vault", icon: "◈" },
+  { href: "/dashboard/history", label: "History", icon: "◷" },
+];
+
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+
   return (
-    <main className="min-h-screen flex flex-col items-center">
-      <div className="flex-1 w-full flex flex-col gap-20 items-center">
-        <nav className="w-full flex justify-center border-b border-b-foreground/10 h-16">
-          <div className="w-full max-w-5xl flex justify-between items-center p-3 px-5 text-sm">
-            <div className="flex gap-5 items-center font-semibold">
-              <Link href={"/"}>arc-multichain-wallet</Link>
-              <Link href={"/dashboard"} className="text-foreground/60 hover:text-foreground">
-                Dashboard
-              </Link>
-              <Link href={"/dashboard/history"} className="text-foreground/60 hover:text-foreground">
-                History
-              </Link>
+    <main className="min-h-screen flex flex-col grid-bg">
+      {/* Top nav */}
+      <nav className="w-full sticky top-0 z-50 flex justify-center border-b border-border/30 h-14 backdrop-blur-xl bg-background/60">
+        <div className="w-full max-w-7xl flex justify-between items-center px-6">
+          <div className="flex items-center gap-6">
+            <Link href="/" className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[var(--gainifi-blue)] to-[var(--gainifi-violet)] flex items-center justify-center text-white font-bold text-xs">
+                G
+              </div>
+              <span className="font-bold text-sm tracking-tight">Gainifi</span>
+            </Link>
+
+            <div className="hidden md:flex items-center gap-1">
+              {navItems.map((item) => {
+                const isActive =
+                  pathname === item.href ||
+                  (item.href !== "/dashboard" &&
+                    pathname.startsWith(item.href));
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 flex items-center gap-1.5 ${isActive
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                      }`}
+                  >
+                    <span className="text-[10px]">{item.icon}</span>
+                    {item.label}
+                  </Link>
+                );
+              })}
             </div>
-            {!hasEnvVars ? <EnvVarWarning /> : <AuthButton />}
           </div>
-        </nav>
 
-        <div className="flex-1 flex flex-col gap-20 max-w-5xl p-5">
-          {children}
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--gainifi-emerald)]/10 text-[var(--gainifi-emerald)] text-[10px] font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--gainifi-emerald)] animate-pulse-glow" />
+              Arc Testnet
+            </div>
+            <ThemeSwitcher />
+          </div>
         </div>
+      </nav>
 
-        <footer className="w-full flex items-center justify-center border-t mx-auto text-center text-xs gap-8 py-16">
-          <ThemeSwitcher />
-        </footer>
+      {/* Mobile nav */}
+      <div className="md:hidden flex items-center gap-1 px-4 py-2 overflow-x-auto border-b border-border/20 bg-background/80 backdrop-blur-lg">
+        {navItems.map((item) => {
+          const isActive =
+            pathname === item.href ||
+            (item.href !== "/dashboard" && pathname.startsWith(item.href));
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${isActive
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground"
+                }`}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
       </div>
 
-      <Toaster toastOptions={{ style: { width: '450px', maxWidth: '90vw' } }} />
+      {/* Content */}
+      <div className="flex-1 w-full max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
+        {children}
+      </div>
+
+      <Toaster
+        toastOptions={{ style: { width: "450px", maxWidth: "90vw" } }}
+      />
     </main>
   );
 }
