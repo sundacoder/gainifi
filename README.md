@@ -1,8 +1,62 @@
 # GainiFi - Arc Multichain Stablecoin Exchange with Nanopayments
 
-GainiFi is an optimal Web3 DeFi platform demonstrating powerful USDC interoperability and unified balance management across EVM chains using the **Circle Gateway**, **Circle Developer-Controlled Wallets**, and **Arc Testnet**. 
+## The Problem With Stablecoins Today
 
-GainiFi leverages Next.js, Radix UI, wagmi/viem for web3 connections, and Supabase + Prisma for a fast and robust database layer.
+The global stablecoin market has crossed **$200 billion** in circulation. Cross-border payments, FX trading, and DeFi together process hundreds of billions in volume monthly. Yet the infrastructure powering these flows remains broken in three fundamental ways:
+
+**Fragmented liquidity.** USDC on Ethereum cannot natively pay someone on Avalanche without bridging delays, slippage, and gas fees denominated in volatile tokens nobody wants to hold.
+
+**Minimum payment sizes.** The smallest meaningful transaction on most networks is dictated by gas costs — often $0.10 to $5.00. This kills entire categories of applications: API monetisation by the millisecond, per-second content streaming, machine-to-machine micro-settlements.
+
+**Idle capital.** Every dollar sitting in an exchange pool, AMM reserve, or user balance earns nothing. In a world of 5%+ risk-free rates, this is an invisible tax on DeFi participants.
+
+**GainiFi eliminates all three.**
+
+---
+
+## What GainiFi Does
+
+GainiFi is a **stablecoin exchange and payment infrastructure protocol** built natively on [Circle's Arc L1](https://arc.network) and the Circle product suite. It combines three capabilities that have never existed together in a single protocol:
+
+### 🔄 StableFX Exchange
+Real-time, institutional-grade stablecoin FX with deep liquidity across USDC, EURC, BRLA, MXNB, QCAD, and more. Powered by Circle's StableFX RFQ engine — every swap is a **peer-verified, atomic settlement**. No AMM slippage. No sandwich attacks. No counterparty risk.
+
+### ⚡ Nanopayment Streams
+Open a payment channel for as little as **$0.000001 per second**. Stream USDC to an API, a content creator, a compute node, or a smart contract in real time. Close it anytime — unspent funds return instantly. Built on Circle Gateway's gas-abstraction layer so the end user never touches ETH, MATIC, or AVAX.
+
+### 📈 USYC Yield Vault
+Every dollar of idle liquidity — LP reserves, channel deposits, unclaimed balances — is automatically deployed into [USYC](https://circle.com/usyc), Circle's on-chain tokenised money market fund backed by short-term US Treasuries. Liquidity providers earn yield on capital they were already committing. For free.
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        GAINIFI APPLICATION                           │
+│                                                                      │
+│   ┌──────────────┐   ┌──────────────────┐   ┌───────────────────┐  │
+│   │  StableFX UI  │   │  Nanopay Stream  │   │   USYC Vault UI   │  │
+│   │  RFQ · Swap  │   │  Open·Tick·Close │   │  Deposit · Yield  │  │
+│   └──────┬───────┘   └────────┬─────────┘   └────────┬──────────┘  │
+│          │                    │                        │             │
+├──────────▼────────────────────▼────────────────────────▼────────────┤
+│                      SETTLEMENT LAYER                                │
+│                                                                      │
+│   ┌──────────────┐   ┌──────────────────┐   ┌───────────────────┐  │
+│   │ StableFX API │   │  NanoChannel.sol  │   │  USYCVault.sol    │  │
+│   │ Quote→Trade  │   │  Permit2 Vouchers │   │  subscribe/redeem │  │
+│   │ PvP Escrow   │   │  EIP-712 Signed   │   │  pricePerShare    │  │
+│   └──────┬───────┘   └────────┬─────────┘   └────────┬──────────┘  │
+│          │                    │                        │             │
+├──────────▼────────────────────▼────────────────────────▼────────────┤
+│                    CIRCLE INFRASTRUCTURE                             │
+│                                                                      │
+│   Arc L1 (0.5s finality · USDC gas) · Gateway (Unified Balance)    │
+│   CCTP V2 (Cross-chain) · Circle MPC Wallets · Developer API        │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
 
 ## Core Features
 1. **Developer-Controlled Wallets:** Invisible, seamless, and programmable wallets abstracting gas and seed phrases from the end-user using the Circle W3S API.
