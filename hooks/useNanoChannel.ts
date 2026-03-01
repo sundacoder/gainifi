@@ -22,7 +22,7 @@ export interface NanoChannelState {
 export function useNanoChannel(channel?: NanoChannelState) {
     const [currentDrain, setCurrentDrain] = useState(0);
     const [claimable, setClaimable] = useState(0);
-    const animRef = useRef<number>();
+    const animRef = useRef<number | null>(null);
 
     // Real-time drain ticker
     useEffect(() => {
